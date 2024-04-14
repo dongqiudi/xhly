@@ -167,7 +167,8 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <main className={`${styles.main} ${inter.className}`}>
-        <div className={styles.center}>
+        <div className={styles.center} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+          <h1 style={{ fontSize: '3em', backgroundImage: 'linear-gradient(45deg, red, blue)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '50px' }}>星火提币系统</h1>
         <Form form={form} onSubmit={onSubmit}>
           <FormList name="task">
             {(fields, { add, remove }) => (
