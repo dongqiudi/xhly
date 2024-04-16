@@ -14,6 +14,7 @@ const ccys = [
   { label: "ETH", value: "ETH" },
   { label: "BTC", value: "BTC" },
   { label: "MATIC", value: "MATIC" },
+  { label: "JUP", value: "JUP" },
   { label: "SOL", value: "SOL" }
 ];
 
@@ -25,6 +26,7 @@ const chains = [
   { label: "ETH-Optimism", value: "ETH-Optimism", fee: "0.00004" },
   { label: "ETH-zkSync Era", value: "ETH-zkSync Era", fee: "0.000041" },
   { label: "ETH-Linea", value: "ETH-Linea", fee: "0.0002" },
+  { label: "JUP-Solana", value: "JUP-Solana", fee: "1.8" },
   { label: "MATIC-Polygon", value: "MATIC-Polygon", fee: "0.1" }
 ];
 
@@ -135,6 +137,7 @@ export default function Home() {
       </Head>
       <main className={`${styles.main} ${inter.className}`}>
         <div className={styles.center}>
+        <h1 style={{ textAlign: 'center', fontSize: '3em', backgroundImage: 'linear-gradient(45deg, red, blue)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '50px' }}>星火提币系统</h1>
         <Form form={form} onSubmit={onSubmit}>
           <FormList name="task">
             {(fields, { add, remove }) => (
