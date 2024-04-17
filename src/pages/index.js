@@ -1,5 +1,5 @@
 import Head from "next/head";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CryptoJS from 'crypto-js';
 import { Inter } from "next/font/google";
 import styles from "@/styles/Home.module.css";
@@ -53,77 +53,76 @@ const apiOptions = [{
   }
 }];
 
-const wallet = (url, method, headers, data) => {
-  return new Promise((resolve, reject) => {
-    fetch(url, { method: method, body: data, headers:  new Headers(headers) })
-    .then(response => {
-      resolve(response.json());
-    })
-    .then(d => {
-      reject(d);
-    })
-    .catch(error => {
-      reject('Error:', error);
-    });
-  });
+async function sendWithdrawRequest(apiConfig, { total, fee, ccy, chain, address, APIKey, SecretKey, Passphrase }) {
+  const { url, path, method, headers, data } = apiConfig;
+  const timestamp = new Date().toISOString();
+  const signData = JSON.stringify({ ...data, total, fee, ccy, chain, address });
+  const SIGN = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(timestamp + method + path + signData, SecretKey));
+
+  const finalHeaders = {
+    ...headers,
+    "OK-ACCESS-KEY": APIKey,
+    "OK-ACCESS-SIGN": SIGN,
+    "OK-ACCESS-TIMESTAMP": timestamp,
+    "OK-ACCESS-PASSPHRASE": Passphrase,
+  };
+
+  const response = await fetch(url + path, { method, headers: new Headers(finalHeaders), body: signData });
+  return response.json();
 }
 
 export default function Home() {
   const [form] = Form.useForm();
+  const [filteredChains, setFilteredChains] = useState(chains);
+  const [theme, setTheme] = useState('light'); // 默认为'light'主题
 
-  function onSubmit(e) {
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+    // 初始化时设置默认的链选项
+    handleCcyChange(ccys[0].value);
+  }, [theme]);
+
+  // 当币种选择变化时调用
+  const handleCcyChange = (selectedCcy) => {
+    // 根据币种前缀过滤出匹配的链选项
+    const matchingChains = chains.filter(chain => chain.value.startsWith(selectedCcy));
+    setFilteredChains(matchingChains);
+    // 如果需要，也可以在这里自动设置链的值为第一个匹配的选项
+    // form.setFieldsValue({ chain: matchingChains[0]?.value });
+  };
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
+  async function onSubmit(e) {
     const allFields = form.getFieldsValue(true);
     if (e.validateResult === true) {
-      allFields.task.map((task, index)=>{
-        let { api, ccy, chain, total, address, APIKey, SecretKey, Passphrase } = task;
-        let apiConfig = apiOptions[apiOptions.findIndex(item => item.value == api)];
-        let theCcy = ccys[ccys.findIndex(item => item.value == ccy)].label;
-        let theChain = chains[chains.findIndex(item => item.value == chain)].label;
-        let fee = chains[chains.findIndex(item => item.value == chain)].fee;
-        //判断错误 数量<=0 
-        if(!apiConfig || total <= 0){
-          MessagePlugin.warning('任务'+ (index/1+1) +'：禁止反向提币');
-          return;
+      for (const [index, task] of allFields.task.entries()) {
+        const { api, ccy, chain, total, address, APIKey, SecretKey, Passphrase } = task;
+        const apiConfig = apiOptions.find(item => item.value === api);
+        const chainConfig = chains.find(item => item.value === chain);
+        const fee = chainConfig ? chainConfig.fee : null;
+
+        if (!apiConfig || total <= 0) {
+          MessagePlugin.warning(`任务${index + 1}：禁止反向提币`);
+          continue;
         }
-        //分解地址信息
-        address.split('\n').map(addr => {
-          //初始化数据
-          let { url, path, method } = apiConfig;
-          let headers = JSON.parse(JSON.stringify(apiConfig.headers));
-          let data = JSON.parse(JSON.stringify(apiConfig.data));
-          //替换数据
-          Object.getOwnPropertyNames(data).map(key => {
-            data[key] = data[key].replace("{total}", total);
-            data[key] = data[key].replace("{fee}", fee);
-            data[key] = data[key].replace("{ccy}", ccy);
-            data[key] = data[key].replace("{chain}", chain);
-            data[key] = data[key].replace("{address}", addr);
-          });
-          //生成SIGN 替换协议头
-          let timestamp = new Date().toISOString();
-          let SIGN = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(timestamp + method + path + JSON.stringify(data), SecretKey));
-          Object.getOwnPropertyNames(headers).map(key => {
-            headers[key] = headers[key].replace("{APIKey}", APIKey);
-            headers[key] = headers[key].replace("{SecretKey}", SIGN);
-            headers[key] = headers[key].replace("{Timestamp}", timestamp);
-            headers[key] = headers[key].replace("{Passphrase}", Passphrase);
-          });
-          wallet(url+path, method, headers, JSON.stringify(data)).then(res=>{
-            if(res.code == '0'){
-              NotificationPlugin.success({
-                title: "成功",
-                content: addr
-              });
-            }else{
-              NotificationPlugin.error({
-                placement: 'top-left',
-                title: "提币失败",
-                content: addr + "："+ res.msg
-              });
+
+        const addresses = address.split('\n');
+        for (const addr of addresses) {
+          try {
+            const response = await sendWithdrawRequest(apiConfig, { total, fee, ccy, chain, address: addr, APIKey, SecretKey, Passphrase });
+            if (response.code === '0') {
+              NotificationPlugin.success({ title: "成功", content: addr });
+            } else {
+              NotificationPlugin.error({ placement: 'top-left', title: "提币失败", content: `${addr}：${response.msg}` });
             }
-          });
-        });
-      });
+          } catch (error) {
+            NotificationPlugin.error({ placement: 'top-left', title: "请求失败", content: `${addr}：${error}` });
+          }
+        }
+      }
     }
   }
 
@@ -137,7 +136,7 @@ export default function Home() {
       </Head>
       <main className={`${styles.main} ${inter.className}`}>
         <div className={styles.center}>
-        <h1 style={{ textAlign: 'center', fontSize: '3em', backgroundImage: 'linear-gradient(45deg, red, blue)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '50px' }}>星火提币系统</h1>
+          <h1 style={{ textAlign: 'center', fontSize: '3em', backgroundImage: 'linear-gradient(45deg, red, blue)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '50px' }}>星火提币系统</h1>
         <Form form={form} onSubmit={onSubmit}>
           <FormList name="task">
             {(fields, { add, remove }) => (
@@ -159,7 +158,7 @@ export default function Home() {
                         label="币种"
                         rules={[{ required: true, type: 'error' }]}
                       >
-                        <Select options={ccys}></Select>
+                        <Select options={ccys} onChange={(value) => handleCcyChange(value)}></Select>
                       </FormItem>
                       <FormItem
                         {...restField}
@@ -167,7 +166,7 @@ export default function Home() {
                         label="链"  
                         rules={[{ required: true, type: 'error' }]}
                       >
-                        <Select options={chains}></Select>
+                        <Select options={filteredChains}></Select>
                       </FormItem>
                       <FormItem {...restField} name={[name, 'total']} label="数量" rules={[{ required: true, type: 'error' }]}>
                         <Input />
@@ -176,15 +175,17 @@ export default function Home() {
                         <MinusCircleIcon size="20px" style={{ cursor: 'pointer' }} onClick={() => remove(name)} />
                       </FormItem>
                     </FormItem>
-                    <FormItem {...restField} name={[name, 'APIKey']} label="APIKey" rules={[{ required: true, type: 'error' }]}>
-                      <Input />
-                    </FormItem>
-                    <FormItem {...restField} name={[name, 'SecretKey']} label="SecretKey" rules={[{ required: true, type: 'error' }]}>
-                      <Input />
-                    </FormItem>
-                    <FormItem {...restField} name={[name, 'Passphrase']} label="Passphrase" rules={[{ required: true, type: 'error' }]}>
-                      <Input />
-                    </FormItem>
+                    <div style={{ border: '1px solid #eee', padding: '10px', borderRadius: '5px', marginBottom: '10px' }}>
+                      <FormItem {...restField} name={[name, 'APIKey']} label="APIKey" rules={[{ required: true, type: 'error' }]}>
+                        <Input />
+                      </FormItem>
+                      <FormItem {...restField} name={[name, 'SecretKey']} label="SecretKey" rules={[{ required: true, type: 'error' }]}>
+                        <Input />
+                      </FormItem>
+                      <FormItem {...restField} name={[name, 'Passphrase']} label="Passphrase" rules={[{ required: true, type: 'error' }]}>
+                        <Input />
+                      </FormItem>
+                    </div>
                     <FormItem {...restField} name={[name, 'address']} label="地址" rules={[{ required: true, type: 'error' }]}>
                       <Textarea />
                     </FormItem>
@@ -207,6 +208,7 @@ export default function Home() {
             </Button>
           </FormItem>
         </Form>
+        <Button onClick={toggleTheme} style={{ position: 'fixed', top: '10px', right: '10px' }}>切换主题</Button>
         </div>
       </main>
     </>
