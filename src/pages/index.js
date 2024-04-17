@@ -56,8 +56,20 @@ const apiOptions = [{
 async function sendWithdrawRequest(apiConfig, { total, fee, ccy, chain, address, APIKey, SecretKey, Passphrase }) {
   const { url, path, method, headers, data } = apiConfig;
   const timestamp = new Date().toISOString();
-  const signData = JSON.stringify({ ...data, total, fee, ccy, chain, address });
-  const SIGN = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(timestamp + method + path + signData, SecretKey));
+  
+  // 替换data中的占位符为实际的参数值
+  const processedData = JSON.stringify({
+    ...data,
+    amt: total.toString(), // 确保amt是字符串格式，如果API要求的是数字，去掉toString()
+    fee: fee, // 根据API要求，如果需要，转换为字符串
+    ccy: ccy,
+    chain: chain,
+    toAddr: address
+  });
+
+  // 生成签名
+  const signString = timestamp + method + path + processedData;
+  const SIGN = CryptoJS.enc.Base64.stringify(CryptoJS.HmacSHA256(signString, SecretKey));
 
   const finalHeaders = {
     ...headers,
@@ -67,7 +79,7 @@ async function sendWithdrawRequest(apiConfig, { total, fee, ccy, chain, address,
     "OK-ACCESS-PASSPHRASE": Passphrase,
   };
 
-  const response = await fetch(url + path, { method, headers: new Headers(finalHeaders), body: signData });
+  const response = await fetch(url + path, { method, headers: new Headers(finalHeaders), body: processedData });
   return response.json();
 }
 
@@ -110,16 +122,19 @@ export default function Home() {
         }
 
         const addresses = address.split('\n');
-        for (const addr of addresses) {
+        for (let i = 0; i < addresses.length; i++) {
+          if (i > 0 && i % 5 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 每处理5个地址后等待1秒
+          }
           try {
-            const response = await sendWithdrawRequest(apiConfig, { total, fee, ccy, chain, address: addr, APIKey, SecretKey, Passphrase });
+            const response = await sendWithdrawRequest(apiConfig, { total, fee, ccy, chain, address: addresses[i], APIKey, SecretKey, Passphrase });
             if (response.code === '0') {
-              NotificationPlugin.success({ title: "成功", content: addr });
+              NotificationPlugin.success({ title: "成功", content: addresses[i] });
             } else {
-              NotificationPlugin.error({ placement: 'top-left', title: "提币失败", content: `${addr}：${response.msg}` });
+              NotificationPlugin.error({ placement: 'top-left', title: "提币失败", content: `${addresses[i]}：${response.msg}` });
             }
           } catch (error) {
-            NotificationPlugin.error({ placement: 'top-left', title: "请求失败", content: `${addr}：${error}` });
+            NotificationPlugin.error({ placement: 'top-left', title: "请求失败", content: `${addresses[i]}：${error}` });
           }
         }
       }
