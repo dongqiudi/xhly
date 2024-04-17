@@ -38,6 +38,9 @@
   --callout-border-rgb: 172, 175, 176;
   --card-rgb: 180, 185, 188;
   --card-border-rgb: 131, 134, 135;
+
+  --background-color: #fff; /* 默认主题颜色 */
+  --text-color: #000;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -70,6 +73,9 @@
     --callout-border-rgb: 108, 108, 108;
     --card-rgb: 100, 100, 100;
     --card-border-rgb: 200, 200, 200;
+
+    --background-color: #8e8d8db0; /* 暗主题颜色 */
+    --text-color: #fff;
   }
 }
 
@@ -105,3 +111,20 @@ a {
     color-scheme: dark;
   }
 }
+/* styles.css */
+:root {
+  --background-color: #fff;
+  --text-color: #000;
+}
+
+[data-theme="dark"] {
+  --background-color: #8e8d8db0;
+  --text-color: #fff;
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+/* 其他需要根据主题变化的样式 */
