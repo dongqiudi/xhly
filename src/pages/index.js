@@ -26,6 +26,7 @@ const chains = [
   { label: "ETH-Optimism", value: "ETH-Optimism", fee: "0.00004" },
   { label: "ETH-zkSync Era", value: "ETH-zkSync Era", fee: "0.000041" },
   { label: "ETH-Linea", value: "ETH-Linea", fee: "0.0002" },
+  { label: "ETH-ERC20", value: "ETH-ERC20", fee: "0.0008" },
   { label: "JUP-Solana", value: "JUP-Solana", fee: "1.8" },
   { label: "MATIC-Polygon", value: "MATIC-Polygon", fee: "0.1" }
 ];
